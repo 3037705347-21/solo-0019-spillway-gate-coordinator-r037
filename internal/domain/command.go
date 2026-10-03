@@ -118,12 +118,6 @@ func NewGateCommand(
 	}, nil
 }
 
-func (c *GateCommand) StageTransition(kind CommandTransitionKind, detail string, now time.Time) {
-	c.appendTransition(kind, detail, now)
-	c.Version++
-	c.UpdatedAt = now.UTC()
-}
-
 func (c *GateCommand) CommitTransition(kind CommandTransitionKind, detail string, now time.Time) {
 	c.appendTransition(kind, detail, now)
 	c.UpdatedAt = now.UTC()

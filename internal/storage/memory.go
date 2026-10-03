@@ -115,24 +115,9 @@ func (m *MemoryRepository) ReviewCommand(
 	}
 
 	nextCommand := cloneCommand(command)
-	attemptKind := domain.TransitionReviewRejected
-	attemptDetail := "review blocked by " + decision.Verifier
-	if decision.IsClear() {
-		attemptKind = domain.TransitionReviewAccepted
-		attemptDetail = "review clear by " + decision.Verifier
-	}
-	nextCommand.StageTransition(attemptKind, attemptDetail, now)
-	m.commands[nextCommand.ID] = cloneCommand(nextCommand)
-
 	if err := nextCommand.Review(decision, token, now); err != nil {
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
-
-	commitKind := domain.TransitionReviewRejected
-	if decision.IsClear() {
-		commitKind = domain.TransitionReviewAccepted
-	}
-	nextCommand.CommitTransition(commitKind, "review committed", now)
 
 	nextGate := gate
 	if decision.IsClear() {
@@ -140,6 +125,14 @@ func (m *MemoryRepository) ReviewCommand(
 			return domain.GateCommand{}, domain.Gate{}, err
 		}
 	}
+
+	commitKind := domain.TransitionReviewRejected
+	commitDetail := "review blocked by " + decision.Verifier
+	if decision.IsClear() {
+		commitKind = domain.TransitionReviewAccepted
+		commitDetail = "review clear by " + decision.Verifier
+	}
+	nextCommand.CommitTransition(commitKind, commitDetail, now)
 
 	m.commands[nextCommand.ID] = nextCommand
 	m.gates[nextGate.ID] = nextGate
@@ -167,16 +160,14 @@ func (m *MemoryRepository) ExecuteCommand(
 	}
 
 	nextCommand := cloneCommand(command)
-	nextCommand.StageTransition(
-		domain.TransitionExecutionStarted,
-		"execution requested by "+operator,
-		now,
-	)
-	m.commands[nextCommand.ID] = cloneCommand(nextCommand)
-
 	if err := nextCommand.BeginExecution(token, operator, now); err != nil {
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
+	nextCommand.CommitTransition(
+		domain.TransitionExecutionStarted,
+		"execution started by "+nextCommand.ExecutedBy,
+		now,
+	)
 
 	nextGate := gate
 	if err := nextGate.StartMovement(nextCommand.ID, now); err != nil {
